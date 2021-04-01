@@ -3,7 +3,7 @@ import { ARButton } from '../jsm/webxr/ARButton.js';
 import { OrbitControls } from '../jsm/controls/OrbitControls.js';
 import { GLTFLoader } from '../jsm/loaders/GLTFLoader.js';
 import { RGBELoader } from '../jsm/loaders/RGBELoader.js';
-import { RoughnessMipmapper } from './jsm/utils/RoughnessMipmapper.js';
+import { RoughnessMipmapper } from '../jsm/utils/RoughnessMipmapper.js';
 
 let container;
 let camera, scene, renderer;
