@@ -26,7 +26,7 @@ $(".ar-object").click(function(){
 });
 
 
-$("#ARButton",function(){
+$("#ARButton").click(function(){
     current_object.visible = false;
 });
 
