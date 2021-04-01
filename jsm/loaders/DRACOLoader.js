@@ -3,7 +3,7 @@ import {
 	BufferGeometry,
 	FileLoader,
 	Loader
-} from '../../../build/three.module.js';
+} from "../../../build/three.module.js";
 
 var DRACOLoader = function ( manager ) {
 
@@ -587,7 +587,7 @@ DRACOLoader.DRACOWorker = function () {
 
 	}
 
-	function getDracoDataType( draco, attributeType ) {
+	function getDracoDataType ( draco, attributeType ) {
 
 		switch ( attributeType ) {
 

@@ -61,7 +61,7 @@ import {
 	Vector3,
 	VectorKeyframeTrack,
 	sRGBEncoding
-} from '../../../build/three.module.js';
+} from "../../../build/three.module.js";
 
 var GLTFLoader = ( function () {
 
@@ -70,8 +70,8 @@ var GLTFLoader = ( function () {
 		Loader.call( this, manager );
 
 		this.dracoLoader = null;
+		this.ddsLoader = null;
 		this.ktx2Loader = null;
-		this.meshoptDecoder = null;
 
 		this.pluginCallbacks = [];
 
@@ -89,12 +89,6 @@ var GLTFLoader = ( function () {
 
 		this.register( function ( parser ) {
 
-			return new GLTFTextureWebPExtension( parser );
-
-		} );
-
-		this.register( function ( parser ) {
-
 			return new GLTFMaterialsTransmissionExtension( parser );
 
 		} );
@@ -102,12 +96,6 @@ var GLTFLoader = ( function () {
 		this.register( function ( parser ) {
 
 			return new GLTFLightsExtension( parser );
-
-		} );
-
-		this.register( function ( parser ) {
-
-			return new GLTFMeshoptCompression( parser );
 
 		} );
 
@@ -195,26 +183,16 @@ var GLTFLoader = ( function () {
 
 		},
 
-		setDDSLoader: function () {
+		setDDSLoader: function ( ddsLoader ) {
 
-			throw new Error(
-
-				'THREE.GLTFLoader: "MSFT_texture_dds" no longer supported. Please update to "KHR_texture_basisu".'
-
-			);
+			this.ddsLoader = ddsLoader;
+			return this;
 
 		},
 
 		setKTX2Loader: function ( ktx2Loader ) {
 
 			this.ktx2Loader = ktx2Loader;
-			return this;
-
-		},
-
-		setMeshoptDecoder: function ( meshoptDecoder ) {
-
-			this.meshoptDecoder = meshoptDecoder;
 			return this;
 
 		},
@@ -293,10 +271,8 @@ var GLTFLoader = ( function () {
 
 				path: path || this.resourcePath || '',
 				crossOrigin: this.crossOrigin,
-				requestHeader: this.requestHeader,
 				manager: this.manager,
-				ktx2Loader: this.ktx2Loader,
-				meshoptDecoder: this.meshoptDecoder
+				ktx2Loader: this.ktx2Loader
 
 			} );
 
@@ -334,6 +310,10 @@ var GLTFLoader = ( function () {
 
 						case EXTENSIONS.KHR_DRACO_MESH_COMPRESSION:
 							extensions[ extensionName ] = new GLTFDracoMeshCompressionExtension( json, this.dracoLoader );
+							break;
+
+						case EXTENSIONS.MSFT_TEXTURE_DDS:
+							extensions[ extensionName ] = new GLTFTextureDDSExtension( this.ddsLoader );
 							break;
 
 						case EXTENSIONS.KHR_TEXTURE_TRANSFORM:
@@ -417,9 +397,27 @@ var GLTFLoader = ( function () {
 		KHR_TEXTURE_BASISU: 'KHR_texture_basisu',
 		KHR_TEXTURE_TRANSFORM: 'KHR_texture_transform',
 		KHR_MESH_QUANTIZATION: 'KHR_mesh_quantization',
-		EXT_TEXTURE_WEBP: 'EXT_texture_webp',
-		EXT_MESHOPT_COMPRESSION: 'EXT_meshopt_compression'
+		MSFT_TEXTURE_DDS: 'MSFT_texture_dds'
 	};
+
+	/**
+	 * DDS Texture Extension
+	 *
+	 * Specification: https://github.com/KhronosGroup/glTF/tree/master/extensions/2.0/Vendor/MSFT_texture_dds
+	 *
+	 */
+	function GLTFTextureDDSExtension( ddsLoader ) {
+
+		if ( ! ddsLoader ) {
+
+			throw new Error( 'THREE.GLTFLoader: Attempting to load .dds texture without importing DDSLoader' );
+
+		}
+
+		this.name = EXTENSIONS.MSFT_TEXTURE_DDS;
+		this.ddsLoader = ddsLoader;
+
+	}
 
 	/**
 	 * Punctual Lights Extension
@@ -504,7 +502,7 @@ var GLTFLoader = ( function () {
 				break;
 
 			default:
-				throw new Error( 'THREE.GLTFLoader: Unexpected light type: ' + lightDef.type );
+				throw new Error( 'THREE.GLTFLoader: Unexpected light type, "' + lightDef.type + '".' );
 
 		}
 
@@ -664,8 +662,7 @@ var GLTFLoader = ( function () {
 
 				var scale = extension.clearcoatNormalTexture.scale;
 
-				// https://github.com/mrdoob/three.js/issues/11438#issuecomment-507003995
-				materialParams.clearcoatNormalScale = new Vector2( scale, - scale );
+				materialParams.clearcoatNormalScale = new Vector2( scale, scale );
 
 			}
 
@@ -734,6 +731,7 @@ var GLTFLoader = ( function () {
 	 * BasisU Texture Extension
 	 *
 	 * Specification: https://github.com/KhronosGroup/glTF/tree/master/extensions/2.0/Khronos/KHR_texture_basisu
+	 * (draft PR https://github.com/KhronosGroup/glTF/pull/1751)
 	 */
 	function GLTFTextureBasisUExtension( parser ) {
 
@@ -761,164 +759,11 @@ var GLTFLoader = ( function () {
 
 		if ( ! loader ) {
 
-			if ( json.extensionsRequired && json.extensionsRequired.indexOf( this.name ) >= 0 ) {
-
-				throw new Error( 'THREE.GLTFLoader: setKTX2Loader must be called before loading KTX2 textures' );
-
-			} else {
-
-				// Assumes that the extension is optional and that a fallback texture is present
-				return null;
-
-			}
+			throw new Error( 'THREE.GLTFLoader: setKTX2Loader must be called before loading KTX2 textures' );
 
 		}
 
 		return parser.loadTextureImage( textureIndex, source, loader );
-
-	};
-
-	/**
-	 * WebP Texture Extension
-	 *
-	 * Specification: https://github.com/KhronosGroup/glTF/tree/master/extensions/2.0/Vendor/EXT_texture_webp
-	 */
-	function GLTFTextureWebPExtension( parser ) {
-
-		this.parser = parser;
-		this.name = EXTENSIONS.EXT_TEXTURE_WEBP;
-		this.isSupported = null;
-
-	}
-
-	GLTFTextureWebPExtension.prototype.loadTexture = function ( textureIndex ) {
-
-		var name = this.name;
-		var parser = this.parser;
-		var json = parser.json;
-
-		var textureDef = json.textures[ textureIndex ];
-
-		if ( ! textureDef.extensions || ! textureDef.extensions[ name ] ) {
-
-			return null;
-
-		}
-
-		var extension = textureDef.extensions[ name ];
-		var source = json.images[ extension.source ];
-
-		var loader = parser.textureLoader;
-		if ( source.uri ) {
-
-			var handler = parser.options.manager.getHandler( source.uri );
-			if ( handler !== null ) loader = handler;
-
-		}
-
-		return this.detectSupport().then( function ( isSupported ) {
-
-			if ( isSupported ) return parser.loadTextureImage( textureIndex, source, loader );
-
-			if ( json.extensionsRequired && json.extensionsRequired.indexOf( name ) >= 0 ) {
-
-				throw new Error( 'THREE.GLTFLoader: WebP required by asset but unsupported.' );
-
-			}
-
-			// Fall back to PNG or JPEG.
-			return parser.loadTexture( textureIndex );
-
-		} );
-
-	};
-
-	GLTFTextureWebPExtension.prototype.detectSupport = function () {
-
-		if ( ! this.isSupported ) {
-
-			this.isSupported = new Promise( function ( resolve ) {
-
-				var image = new Image();
-
-				// Lossy test image. Support for lossy images doesn't guarantee support for all
-				// WebP images, unfortunately.
-				image.src = 'data:image/webp;base64,UklGRiIAAABXRUJQVlA4IBYAAAAwAQCdASoBAAEADsD+JaQAA3AAAAAA';
-
-				image.onload = image.onerror = function () {
-
-					resolve( image.height === 1 );
-
-				};
-
-			} );
-
-		}
-
-		return this.isSupported;
-
-	};
-
-	/**
-	* meshopt BufferView Compression Extension
-	*
-	* Specification: https://github.com/KhronosGroup/glTF/tree/master/extensions/2.0/Vendor/EXT_meshopt_compression
-	*/
-	function GLTFMeshoptCompression( parser ) {
-
-		this.name = EXTENSIONS.EXT_MESHOPT_COMPRESSION;
-		this.parser = parser;
-
-	}
-
-	GLTFMeshoptCompression.prototype.loadBufferView = function ( index ) {
-
-		var json = this.parser.json;
-		var bufferView = json.bufferViews[ index ];
-
-		if ( bufferView.extensions && bufferView.extensions[ this.name ] ) {
-
-			var extensionDef = bufferView.extensions[ this.name ];
-
-			var buffer = this.parser.getDependency( 'buffer', extensionDef.buffer );
-			var decoder = this.parser.options.meshoptDecoder;
-
-			if ( ! decoder || ! decoder.supported ) {
-
-				if ( json.extensionsRequired && json.extensionsRequired.indexOf( this.name ) >= 0 ) {
-
-					throw new Error( 'THREE.GLTFLoader: setMeshoptDecoder must be called before loading compressed files' );
-
-				} else {
-
-					// Assumes that the extension is optional and that fallback buffer data is present
-					return null;
-
-				}
-
-			}
-
-			return Promise.all( [ buffer, decoder.ready ] ).then( function ( res ) {
-
-				var byteOffset = extensionDef.byteOffset || 0;
-				var byteLength = extensionDef.byteLength || 0;
-
-				var count = extensionDef.count;
-				var stride = extensionDef.byteStride;
-
-				var result = new ArrayBuffer( count * stride );
-				var source = new Uint8Array( res[ 0 ], byteOffset, byteLength );
-
-				decoder.decodeGltfBuffer( new Uint8Array( result ), count, stride, source, extensionDef.mode, extensionDef.filter );
-				return result;
-
-			} );
-
-		} else {
-
-			return null;
-
-		}
 
 	};
 
@@ -951,11 +796,10 @@ var GLTFLoader = ( function () {
 
 		}
 
-		var chunkContentsLength = this.header.length - BINARY_EXTENSION_HEADER_LENGTH;
 		var chunkView = new DataView( data, BINARY_EXTENSION_HEADER_LENGTH );
 		var chunkIndex = 0;
 
-		while ( chunkIndex < chunkContentsLength ) {
+		while ( chunkIndex < chunkView.byteLength ) {
 
 			var chunkLength = chunkView.getUint32( chunkIndex, true );
 			chunkIndex += 4;
@@ -1909,7 +1753,6 @@ var GLTFLoader = ( function () {
 		}
 
 		this.textureLoader.setCrossOrigin( this.options.crossOrigin );
-		this.textureLoader.setRequestHeader( this.options.requestHeader );
 
 		this.fileLoader = new FileLoader( this.options.manager );
 		this.fileLoader.setResponseType( 'arraybuffer' );
@@ -1950,21 +1793,13 @@ var GLTFLoader = ( function () {
 
 		} );
 
-		Promise.all( this._invokeAll( function ( ext ) {
+		Promise.all( [
 
-			return ext.beforeRoot && ext.beforeRoot();
+			this.getDependencies( 'scene' ),
+			this.getDependencies( 'animation' ),
+			this.getDependencies( 'camera' ),
 
-		} ) ).then( function () {
-
-			return Promise.all( [
-
-				parser.getDependencies( 'scene' ),
-				parser.getDependencies( 'animation' ),
-				parser.getDependencies( 'camera' ),
-
-			] );
-
-		} ).then( function ( dependencies ) {
+		] ).then( function ( dependencies ) {
 
 			var result = {
 				scene: dependencies[ 0 ][ json.scene || 0 ],
@@ -1980,15 +1815,7 @@ var GLTFLoader = ( function () {
 
 			assignExtrasToUserData( result, json );
 
-			Promise.all( parser._invokeAll( function ( ext ) {
-
-				return ext.afterRoot && ext.afterRoot( result );
-
-			} ) ).then( function () {
-
-				onLoad( result );
-
-			} );
+			onLoad( result );
 
 		} ).catch( onError );
 
@@ -2429,17 +2256,39 @@ var GLTFLoader = ( function () {
 	 */
 	GLTFParser.prototype.loadTexture = function ( textureIndex ) {
 
+		var parser = this;
 		var json = this.json;
 		var options = this.options;
-		var textureDef = json.textures[ textureIndex ];
-		var source = json.images[ textureDef.source ];
 
-		var loader = this.textureLoader;
+		var textureDef = json.textures[ textureIndex ];
+
+		var textureExtensions = textureDef.extensions || {};
+
+		var source;
+
+		if ( textureExtensions[ EXTENSIONS.MSFT_TEXTURE_DDS ] ) {
+
+			source = json.images[ textureExtensions[ EXTENSIONS.MSFT_TEXTURE_DDS ].source ];
+
+		} else {
+
+			source = json.images[ textureDef.source ];
+
+		}
+
+		var loader;
 
 		if ( source.uri ) {
 
-			var handler = options.manager.getHandler( source.uri );
-			if ( handler !== null ) loader = handler;
+			loader = options.manager.getHandler( source.uri );
+
+		}
+
+		if ( ! loader ) {
+
+			loader = textureExtensions[ EXTENSIONS.MSFT_TEXTURE_DDS ]
+				? parser.extensions[ EXTENSIONS.MSFT_TEXTURE_DDS ].ddsLoader
+				: this.textureLoader;
 
 		}
 
@@ -2488,10 +2337,6 @@ var GLTFLoader = ( function () {
 				return sourceURI;
 
 			} );
-
-		} else if ( source.uri === undefined ) {
-
-			throw new Error( 'THREE.GLTFLoader: Image ' + textureIndex + ' is missing URI and bufferView' );
 
 		}
 
@@ -2596,7 +2441,7 @@ var GLTFLoader = ( function () {
 	 * Assigns final material to a Mesh, Line, or Points instance. The instance
 	 * already has a material (generated from the glTF material options alone)
 	 * but reuse of the same glTF material may require multiple threejs materials
-	 * to accommodate different primitive types, defines, etc. New materials will
+	 * to accomodate different primitive types, defines, etc. New materials will
 	 * be created if necessary, and reused from a cache.
 	 * @param  {Object3D} mesh Mesh, Line, or Points instance.
 	 */
@@ -2672,20 +2517,11 @@ var GLTFLoader = ( function () {
 				cachedMaterial = material.clone();
 
 				if ( useSkinning ) cachedMaterial.skinning = true;
+				if ( useVertexTangents ) cachedMaterial.vertexTangents = true;
 				if ( useVertexColors ) cachedMaterial.vertexColors = true;
 				if ( useFlatShading ) cachedMaterial.flatShading = true;
 				if ( useMorphTargets ) cachedMaterial.morphTargets = true;
 				if ( useMorphNormals ) cachedMaterial.morphNormals = true;
-
-				if ( useVertexTangents ) {
-
-					cachedMaterial.vertexTangents = true;
-
-					// https://github.com/mrdoob/three.js/issues/11438#issuecomment-507003995
-					if ( cachedMaterial.normalScale ) cachedMaterial.normalScale.y *= - 1;
-					if ( cachedMaterial.clearcoatNormalScale ) cachedMaterial.clearcoatNormalScale.y *= - 1;
-
-				}
 
 				this.cache.add( cacheKey, cachedMaterial );
 
@@ -2702,6 +2538,19 @@ var GLTFLoader = ( function () {
 		if ( material.aoMap && geometry.attributes.uv2 === undefined && geometry.attributes.uv !== undefined ) {
 
 			geometry.setAttribute( 'uv2', geometry.attributes.uv );
+
+		}
+
+		// https://github.com/mrdoob/three.js/issues/11438#issuecomment-507003995
+		if ( material.normalScale && ! useVertexTangents ) {
+
+			material.normalScale.y = - material.normalScale.y;
+
+		}
+
+		if ( material.clearcoatNormalScale && ! useVertexTangents ) {
+
+			material.clearcoatNormalScale.y = - material.clearcoatNormalScale.y;
 
 		}
 
@@ -2825,12 +2674,11 @@ var GLTFLoader = ( function () {
 
 			pending.push( parser.assignTexture( materialParams, 'normalMap', materialDef.normalTexture ) );
 
-			// https://github.com/mrdoob/three.js/issues/11438#issuecomment-507003995
-			materialParams.normalScale = new Vector2( 1, - 1 );
+			materialParams.normalScale = new Vector2( 1, 1 );
 
 			if ( materialDef.normalTexture.scale !== undefined ) {
 
-				materialParams.normalScale.set( materialDef.normalTexture.scale, - materialDef.normalTexture.scale );
+				materialParams.normalScale.set( materialDef.normalTexture.scale, materialDef.normalTexture.scale );
 
 			}
 
@@ -2895,13 +2743,11 @@ var GLTFLoader = ( function () {
 	/** When Object3D instances are targeted by animation, they need unique names. */
 	GLTFParser.prototype.createUniqueName = function ( originalName ) {
 
-		var sanitizedName = PropertyBinding.sanitizeNodeName( originalName || '' );
-
-		var name = sanitizedName;
+		var name = PropertyBinding.sanitizeNodeName( originalName || '' );
 
 		for ( var i = 1; this.nodeNamesUsed[ name ]; ++ i ) {
 
-			name = sanitizedName + '_' + i;
+			name = originalName + '_' + i;
 
 		}
 
@@ -3242,7 +3088,6 @@ var GLTFLoader = ( function () {
 
 		var parser = this;
 		var json = this.json;
-		var extensions = this.extensions;
 
 		var meshDef = json.meshes[ meshIndex ];
 		var primitives = meshDef.primitives;
@@ -3337,9 +3182,9 @@ var GLTFLoader = ( function () {
 
 				mesh.name = parser.createUniqueName( meshDef.name || ( 'mesh_' + meshIndex ) );
 
-				assignExtrasToUserData( mesh, meshDef );
+				if ( geometries.length > 1 ) mesh.name += '_' + i;
 
-				if ( primitive.extensions ) addUnknownExtensionsToUserData( extensions, mesh, primitive );
+				assignExtrasToUserData( mesh, meshDef );
 
 				parser.assignFinalMaterial( mesh );
 
