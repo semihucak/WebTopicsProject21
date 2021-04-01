@@ -8,9 +8,25 @@
 	</head>
 	<body>
 
-		<div id="info">
-			<a href="https://threejs.org" target="_blank" rel="noopener">three.js</a> ar - hit test<br/>(Chrome Android 81+)
-		</div>
+		<div id="mySidenav" class="sidenav">
+			<a href="javascript:void(0)" class="closebtn" onclick="closeNav()">&times;</a>
+			<a href="#">model 1</a>
+			<a href="#">model 2</a>
+			<a href="#">model 3</a>
+			<a href="#">model 4</a>
+		  </div>
+		  
+		  <span style="font-size:30px;cursor:pointer" onclick="openNav()">&#9776; open</span>
+		  
+		  <script>
+		  function openNav() {
+			document.getElementById("mySidenav").style.width = "250px";
+		  }
+		  
+		  function closeNav() {
+			document.getElementById("mySidenav").style.width = "0";
+		  }
+		  </script>
 
 		<script  src="js/script.js" type="module"></script>
 	</body>
