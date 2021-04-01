@@ -32,6 +32,21 @@ $("#ARButton").click(function(){
     current_object.visible = false;
 });
 
+$("#place-button").click(function(){
+    arPlace();
+});
+
+
+function arPlace(){
+    if ( reticle.visible ) {
+
+         current_object.position.setFromMatrixPosition(reticle.matrix);
+         current_object.visible = true;
+
+     }
+
+}
+
 function loadModel(model){
 
     new RGBELoader()
@@ -51,6 +66,8 @@ function loadModel(model){
 
             current_object = glb.scene;
             scene.add(current_object);
+
+            arPlace();
 
             var box = new THREE.Box3();
             box.setFromObject(current_object);
@@ -99,33 +116,22 @@ function init() {
 
     //
 
-    document.body.appendChild( ARButton.createButton( renderer, { requiredFeatures: [ 'hit-test' ] } ) );
+    let options = {
+        requiredFeatures: ['hit-test'],
+        optionalFeatures: ['dom-overlay'],
+    }
+
+    options.domOverlay = { root: document.getElementById('content')};
+
+    document.body.appendChild( ARButton.createButton(renderer, options));
+
+    //document.body.appendChild( ARButton.createButton( renderer, { requiredFeatures: [ 'hit-test' ] } ) );
 
     //
 
-    const geometry = new THREE.CylinderGeometry( 0.1, 0.1, 0.2, 32 ).translate( 0, 0.1, 0 );
+   
 
-    function onSelect() {
-
-        if ( reticle.visible ) {
-
-           /* const material = new THREE.MeshPhongMaterial( { color: 0xffffff * Math.random() } );
-            const mesh = new THREE.Mesh( geometry, material );
-            mesh.position.setFromMatrixPosition( reticle.matrix );
-            mesh.scale.y = Math.random() * 2 + 1;
-            scene.add( mesh ); */
-
-            current_object.position.setFromMatrixPosition(reticle.matrix);
-            current_object.visible = true;
-
-        }
-
-    }
-
-    controller = renderer.xr.getController( 0 );
-    controller.addEventListener( 'select', onSelect );
-    scene.add( controller );
-
+    
     reticle = new THREE.Mesh(
         new THREE.RingGeometry( 0.15, 0.2, 32 ).rotateX( - Math.PI / 2 ),
         new THREE.MeshBasicMaterial()
@@ -202,7 +208,9 @@ function render( timestamp, frame ) {
 
             if ( hitTestResults.length ) {
 
-                const hit = hitTestResults[ 0 ];
+                var hit = hitTestResults[ 0 ];
+
+                document.getElementById("place-button").style.display = "block";
 
                 reticle.visible = true;
                 reticle.matrix.fromArray( hit.getPose( referenceSpace ).transform.matrix );
